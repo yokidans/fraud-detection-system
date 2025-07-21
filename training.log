@@ -1,0 +1,160 @@
+2025-07-21 10:04:13,141 - models.train - INFO - 
+==================================================
+Starting Ensemble Training
+==================================================
+2025-07-21 10:04:13,141 - models.train - INFO - 
+==================================================
+Dataset Characteristics
+==================================================
+2025-07-21 10:04:13,141 - models.train - INFO - Shape: (273922, 65)
+2025-07-21 10:04:13,141 - models.train - INFO - Sparse matrix with 2881209 non-zero elements
+2025-07-21 10:04:13,141 - models.train - INFO - Density: 16.18%
+2025-07-21 10:04:13,156 - models.train - INFO - 
+Class Distribution:
+0.0    0.5
+1.0    0.5
+2025-07-21 10:04:13,156 - models.train - INFO - Imbalance Ratio: 1.0:1
+2025-07-21 10:04:13,172 - models.train - INFO - 
+==============================
+Training xgboost
+==============================
+2025-07-21 10:04:13,172 - models.train - INFO - 
+==================================================
+Training xgboost model
+==================================================
+2025-07-21 10:04:13,172 - models.train - INFO - 
+==================================================
+Dataset Characteristics
+==================================================
+2025-07-21 10:04:13,172 - models.train - INFO - Shape: (273922, 65)
+2025-07-21 10:04:13,172 - models.train - INFO - Sparse matrix with 2881209 non-zero elements
+2025-07-21 10:04:13,172 - models.train - INFO - Density: 16.18%
+2025-07-21 10:04:13,172 - models.train - INFO - 
+Class Distribution:
+0.0    0.5
+1.0    0.5
+2025-07-21 10:04:13,172 - models.train - INFO - Imbalance Ratio: 1.0:1
+2025-07-21 10:04:13,180 - models.train - INFO - 
+==================================================
+Starting xgboost hyperparameter optimization
+==================================================
+2025-07-21 10:04:13,188 - models.train - INFO - 
+==================================================
+Dataset Characteristics
+==================================================
+2025-07-21 10:04:13,188 - models.train - INFO - Shape: (273922, 65)
+2025-07-21 10:04:13,188 - models.train - INFO - Sparse matrix with 2881209 non-zero elements
+2025-07-21 10:04:13,188 - models.train - INFO - Density: 16.18%
+2025-07-21 10:04:13,188 - models.train - INFO - 
+==================================================
+Dataset Characteristics
+==================================================
+2025-07-21 10:04:13,188 - models.train - INFO - 
+Class Distribution:
+0.0    0.5
+1.0    0.5
+2025-07-21 10:04:13,203 - models.train - INFO - 
+==================================================
+Dataset Characteristics
+==================================================
+2025-07-21 10:04:13,203 - models.train - INFO - 
+==================================================
+Dataset Characteristics
+==================================================
+2025-07-21 10:04:13,203 - models.train - INFO - Shape: (273922, 65)
+2025-07-21 10:04:13,203 - models.train - INFO - Imbalance Ratio: 1.0:1
+2025-07-21 10:04:13,203 - models.train - INFO - Shape: (273922, 65)
+2025-07-21 10:04:13,203 - models.train - INFO - Shape: (273922, 65)
+2025-07-21 10:04:13,203 - models.train - INFO - Sparse matrix with 2881209 non-zero elements
+2025-07-21 10:04:13,203 - models.train - INFO - Sparse matrix with 2881209 non-zero elements
+2025-07-21 10:04:13,203 - models.train - INFO - Sparse matrix with 2881209 non-zero elements
+2025-07-21 10:04:13,203 - models.train - INFO - Density: 16.18%
+2025-07-21 10:04:13,203 - models.train - INFO - Density: 16.18%
+2025-07-21 10:04:13,203 - models.train - INFO - Density: 16.18%
+2025-07-21 10:04:13,203 - models.train - INFO - 
+Class Distribution:
+0.0    0.5
+1.0    0.5
+2025-07-21 10:04:13,219 - models.train - INFO - 
+Class Distribution:
+0.0    0.5
+1.0    0.5
+2025-07-21 10:04:13,219 - models.train - INFO - 
+Class Distribution:
+0.0    0.5
+1.0    0.5
+2025-07-21 10:04:13,219 - models.train - INFO - Imbalance Ratio: 1.0:1
+2025-07-21 10:04:13,219 - models.train - INFO - Imbalance Ratio: 1.0:1
+2025-07-21 10:04:13,219 - models.train - INFO - Imbalance Ratio: 1.0:1
+2025-07-21 10:06:14,998 - models.train - INFO - 
+CV Results - ROC AUC: 0.9756 ± 0.0008
+2025-07-21 10:06:15,000 - models.train - INFO - Avg fit time: 40.16s
+2025-07-21 10:06:15,000 - models.train - INFO - Avg predict time: 0.27s
+2025-07-21 10:06:15,000 - models.train - INFO - Total CV time: 121.79s
+2025-07-21 10:06:15,154 - models.train - INFO - Trial 2/30 - Current best: 0.9756 - Last value: 0.975588493895604
+2025-07-21 10:06:15,161 - models.train - INFO - 
+==================================================
+Dataset Characteristics
+==================================================
+2025-07-21 10:06:15,162 - models.train - INFO - Shape: (273922, 65)
+2025-07-21 10:06:15,162 - models.train - INFO - Sparse matrix with 2881209 non-zero elements
+2025-07-21 10:06:15,162 - models.train - INFO - Density: 16.18%
+2025-07-21 10:06:15,171 - models.train - INFO - 
+Class Distribution:
+0.0    0.5
+1.0    0.5
+2025-07-21 10:06:15,172 - models.train - INFO - Imbalance Ratio: 1.0:1
+2025-07-21 10:09:11,041 - models.train - INFO - 
+CV Results - ROC AUC: 0.9762 ± 0.0006
+2025-07-21 10:09:11,052 - models.train - INFO - Avg fit time: 98.37s
+2025-07-21 10:09:11,053 - models.train - INFO - Avg predict time: 0.69s
+2025-07-21 10:09:11,053 - models.train - INFO - Total CV time: 297.83s
+2025-07-21 10:09:12,031 - models.train - INFO - Trial 3/30 - Current best: 0.9762 - Last value: 0.9761557737036158
+2025-07-21 10:09:12,288 - models.train - INFO - 
+==================================================
+Dataset Characteristics
+==================================================
+2025-07-21 10:09:12,288 - models.train - INFO - Shape: (273922, 65)
+2025-07-21 10:09:12,288 - models.train - INFO - Sparse matrix with 2881209 non-zero elements
+2025-07-21 10:09:12,288 - models.train - INFO - Density: 16.18%
+2025-07-21 10:09:12,476 - models.train - INFO - 
+Class Distribution:
+0.0    0.5
+1.0    0.5
+2025-07-21 10:09:12,487 - models.train - INFO - Imbalance Ratio: 1.0:1
+2025-07-21 10:13:11,515 - models.train - INFO - 
+CV Results - ROC AUC: 0.9758 ± 0.0005
+2025-07-21 10:13:11,515 - models.train - INFO - Avg fit time: 177.91s
+2025-07-21 10:13:11,515 - models.train - INFO - Avg predict time: 1.27s
+2025-07-21 10:13:11,515 - models.train - INFO - Total CV time: 538.31s
+2025-07-21 10:13:12,143 - models.train - INFO - Trial 1/30 - Current best: 0.9762 - Last value: 0.9758081795362962
+2025-07-21 10:13:12,190 - models.train - INFO - 
+==================================================
+Dataset Characteristics
+==================================================
+2025-07-21 10:13:12,190 - models.train - INFO - Shape: (273922, 65)
+2025-07-21 10:13:12,190 - models.train - INFO - Sparse matrix with 2881209 non-zero elements
+2025-07-21 10:13:12,190 - models.train - INFO - Density: 16.18%
+2025-07-21 10:13:12,240 - models.train - INFO - 
+Class Distribution:
+0.0    0.5
+1.0    0.5
+2025-07-21 10:13:12,241 - models.train - INFO - Imbalance Ratio: 1.0:1
+2025-07-21 10:22:52,990 - models.train - INFO - 
+CV Results - ROC AUC: 0.9773 ± 0.0009
+2025-07-21 10:22:53,014 - models.train - INFO - Avg fit time: 369.45s
+2025-07-21 10:22:53,014 - models.train - INFO - Avg predict time: 3.62s
+2025-07-21 10:22:53,014 - models.train - INFO - Total CV time: 1119.78s
+2025-07-21 10:22:54,320 - models.train - INFO - Trial 0/30 - Current best: 0.9773 - Last value: 0.9773354779419353
+2025-07-21 10:22:54,371 - models.train - INFO - 
+==================================================
+Dataset Characteristics
+==================================================
+2025-07-21 10:22:54,371 - models.train - INFO - Shape: (273922, 65)
+2025-07-21 10:22:54,371 - models.train - INFO - Sparse matrix with 2881209 non-zero elements
+2025-07-21 10:22:54,371 - models.train - INFO - Density: 16.18%
+2025-07-21 10:22:54,406 - models.train - INFO - 
+Class Distribution:
+0.0    0.5
+1.0    0.5
+2025-07-21 10:22:54,407 - models.train - INFO - Imbalance Ratio: 1.0:1

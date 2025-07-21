@@ -1,0 +1,11 @@
+﻿global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'fraud-detection'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['fraud-detection:5000']
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
