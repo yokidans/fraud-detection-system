@@ -16,7 +16,21 @@ This system provides advanced fraud detection capabilities for both e-commerce a
    git clone https://github.com/yourusername/fraud-detection-system.git
    cd fraud-detection-system
    ```
-   
+   ## project structure
+### fraud-detection-system/
+### ├── run.ps1
+### ├── src/
+### │   ├── __init__.py
+### │   ├── data/
+### │   │   ├── __init__.py
+### │   │   └── preprocessing.py
+### │   └── models/
+### │       ├── __init__.py
+### │       └── train.py
+### └── data/
+###     ├── raw/
+###     └── processed/
+
    ## Key Features and Best Practices
 
 1. **Modular Design**: The system is organized into clearly defined modules following SOLID principles.
