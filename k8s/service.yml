@@ -1,0 +1,12 @@
+﻿apiVersion: v1
+kind: Service
+metadata:
+  name: fraud-detection
+  namespace: fraud-detection
+spec:
+  selector:
+    app: fraud-detection
+  ports:
+    - protocol: TCP
+      port: 5000
+      targetPort: 5000
