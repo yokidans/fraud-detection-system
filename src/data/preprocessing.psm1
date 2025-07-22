@@ -22,4 +22,4 @@ class DataPreprocessor {
     }
 }
 
-Export-ModuleMember -Class DataPreprocessor
+Export-ModuleMember -Function * -Variable * -Alias *
