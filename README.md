@@ -50,7 +50,7 @@ This project aims to improve fraud detection for e-commerce and bank credit tran
 ### Installation
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/fraud-detection-system.git
+   git clone https://github.com/yokidans/fraud-detection-system.git
    cd fraud-detection-system
    ```
 
