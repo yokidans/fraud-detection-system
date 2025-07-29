@@ -1,4 +1,3 @@
-```markdown
 # Fraud Detection System for E-commerce and Bank Transactions
 
 ## Project Overview
@@ -14,35 +13,33 @@ This project aims to improve fraud detection for e-commerce and bank credit tran
 
 ## Project Structure
 
-```
-fraud-detection-system/
-├── data/
-│   ├── raw/                   # Original datasets (e.g., Fraud_Data.csv, creditcard.csv)
-│   ├── processed/             # Cleaned and processed data (e.g., merged datasets)
-│   └── interim/               # Intermediate files (e.g., feature-engineered data)
-├── models/                    # Saved models (e.g., .pkl files)
-├── notebooks/                 # Jupyter notebooks for exploratory analysis
-├── src/
-│   ├── data/                  # Data processing modules
-│   │   ├── preprocessing.py   # Handles missing values, duplicates, and data cleaning
-│   │   ├── feature_engineering.py # Creates features like time_since_signup
-│   │   └── geolocation.py     # Maps IP addresses to countries
-│   ├── models/                # Model-related code
-│   │   ├── train.py           # Trains models (Logistic Regression, Random Forest, etc.)
-│   │   ├── evaluate.py        # Evaluates models using metrics like AUC-PR and F1-Score
-│   │   └── explainability.py  # Generates SHAP plots for model interpretation
-│   ├── visualization/         # Visualization utilities
-│   │   └── eda.py             # Creates EDA plots (e.g., histograms, correlation matrices)
-│   ├── config.py              # Configuration settings (e.g., file paths, hyperparameters)
-│   └── app/                   # Web application (Flask/Dash)
-│       ├── main.py            # Entry point for the web app
-│       └── templates/         # HTML templates for the UI
-├── tests/                     # Unit and integration tests
-├── docs/                      # Project documentation (e.g., reports, blog posts)
-├── requirements.txt           # Python dependencies
-├── Makefile                   # Build automation (e.g., running tests, preprocessing)
-└── README.md                  # Project documentation (this file)
-```
+## fraud-detection-system/
+### ├── data/
+### │   ├── raw/                   # Original datasets (e.g., Fraud_Data.csv, creditcard.csv)
+### │   ├── processed/             # Cleaned and processed data (e.g., merged datasets)
+### │   └── interim/               # Intermediate files (e.g., feature-engineered data)
+### ├── models/                    # Saved models (e.g., .pkl files)
+### ├── notebooks/                 # Jupyter notebooks for exploratory analysis
+### ├── src/
+### │   ├── data/                  # Data processing modules
+### │   │   ├── preprocessing.py   # Handles missing values, duplicates, and data cleaning
+### │   │   ├── feature_engineering.py # Creates features like time_since_signup
+### │   │   └── geolocation.py     # Maps IP addresses to countries
+### │   ├── models/                # Model-related code
+### │   │   ├── train.py           # Trains models (Logistic Regression, Random Forest, etc.)
+### │   │   ├── evaluate.py        # Evaluates models using metrics like AUC-PR and F1-Score
+### │   │   └── explainability.py  # Generates SHAP plots for model interpretation
+### │   ├── visualization/         # Visualization utilities
+### │   │   └── eda.py             # Creates EDA plots (e.g., histograms, correlation matrices)
+### │   ├── config.py              # Configuration settings (e.g., file paths, hyperparameters)
+### │   └── app/                   # Web application (Flask/Dash)
+### │       ├── main.py            # Entry point for the web app
+### │       └── templates/         # HTML templates for the UI
+### ├── tests/                     # Unit and integration tests
+### ├── docs/                      # Project documentation (e.g., reports, blog posts)
+### ├── requirements.txt           # Python dependencies
+### ├── Makefile                   # Build automation (e.g., running tests, preprocessing)
+### └── README.md                  # Project documentation (this file)
 
 ## Setup Instructions
 
