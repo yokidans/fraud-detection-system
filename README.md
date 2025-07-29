@@ -41,6 +41,13 @@ This project aims to improve fraud detection for e-commerce and bank credit tran
 ### ├── Makefile                   # Build automation (e.g., running tests, preprocessing)
 ### └── README.md                  # Project documentation (this file)
 
+## Dashboard Preview
+![Real-time Fraud Dashboard](docs/dashboard.png "Fraud Detection Dashboard")
+
+Key features:
+- Geolocation tracking
+- Transaction analysis
+
 ## Setup Instructions
 
 ### Prerequisites
