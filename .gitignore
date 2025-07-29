@@ -201,6 +201,28 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# System
+.DS_Store
+Thumbs.db
+
+# Logs & databases
+*.log
+*.sqlite
+
 # Marimo
 marimo/_static/
 marimo/_lsp/

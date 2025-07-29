@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fraud Detection System</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .container { display: flex; gap: 20px; }
+        .form-panel, .results-panel { flex: 1; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select { width: 100%; padding: 8px; box-sizing: border-box; }
+        button { background: #4CAF50; color: white; border: none; padding: 10px 15px; cursor: pointer; }
+        button:hover { background: #45a049; }
+        .risk-indicator { display: flex; justify-content: space-between; margin-top: 5px; }
+        .risk-option { flex: 1; text-align: center; padding: 5px; cursor: pointer; }
+        .risk-option.selected { background: #f0f0f0; font-weight: bold; }
+        .result-card { border: 1px solid #ddd; padding: 15px; margin-top: 20px; }
+        .fraud { color: #d32f2f; }
+        .legit { color: #388e3c; }
+    </style>
+</head>
+<body>
+    <h1>Transaction Evaluation</h1>
+    
+    <div class="container">
+        <div class="form-panel">
+            <h2>Submit a Transaction</h2>
+            
+            <div class="form-group">
+                <label for="amount">Amount ($)</label>
+                <input type="number" id="amount" step="0.01" min="0" required>
+                <div class="risk-indicator">
+                    <div class="risk-option" data-risk="low">Low</div>
+                    <div class="risk-option" data-risk="medium">Medium</div>
+                    <div class="risk-option" data-risk="high">High</div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="time_since">Time Since Last (min)</label>
+                <input type="number" id="time_since" min="0" value="1440">
+                <div class="risk-indicator">
+                    <div class="risk-option" data-risk="high">High</div>
+                    <div class="risk-option" data-risk="medium">Medium</div>
+                    <div class="risk-option" data-risk="low">Low</div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="frequency">Purchase Frequency (24h)</label>
+                <input type="number" id="frequency" min="0" value="1">
+                <div class="risk-indicator">
+                    <div class="risk-option" data-risk="low">Low</div>
+                    <div class="risk-option" data-risk="medium">Medium</div>
+                    <div class="risk-option" data-risk="high">High</div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="foreign_ip"> Foreign IP
+                </label>
+                <div class="risk-indicator">
+                    <div class="risk-option" data-risk="low">Low</div>
+                    <div class="risk-option" data-risk="high">High</div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="device_changed"> Device Changed
+                </label>
+                <div class="risk-indicator">
+                    <div class="risk-option" data-risk="low">Low</div>
+                    <div class="risk-option" data-risk="high">High</div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="txn_count">User Transaction Count</label>
+                <input type="number" id="txn_count" min="0" value="1">
+                <div class="risk-indicator">
+                    <div class="risk-option" data-risk="high">High</div>
+                    <div class="risk-option" data-risk="medium">Medium</div>
+                    <div class="risk-option" data-risk="low">Low</div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="user_id">User ID</label>
+                <input type="text" id="user_id" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="ip_address">IP Address</label>
+                <input type="text" id="ip_address" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="device_id">Device ID</label>
+                <input type="text" id="device_id" required>
+            </div>
+            
+            <button id="evaluate-btn">Evaluate Transaction</button>
+        </div>
+        
+        <div class="results-panel">
+            <h2>Prediction Results</h2>
+            <div id="results" class="result-card">
+                <p>Fill in the transaction details and click "Evaluate" to get a fraud risk assessment.</p>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Handle risk indicator clicks
+            document.querySelectorAll('.risk-option').forEach(option => {
+                option.addEventListener('click', function() {
+                    const parent = this.parentElement;
+                    parent.querySelectorAll('.risk-option').forEach(el => el.classList.remove('selected'));
+                    this.classList.add('selected');
+                });
+            });
+            
+            // Handle evaluate button click
+            document.getElementById('evaluate-btn').addEventListener('click', evaluateTransaction);
+        });
+        
+        function evaluateTransaction() {
+            const transaction = {
+                amount: parseFloat(document.getElementById('amount').value),
+                time_since_last_transaction: parseInt(document.getElementById('time_since').value),
+                purchase_frequency_24h: parseInt(document.getElementById('frequency').value),
+                is_foreign_ip: document.getElementById('foreign_ip').checked ? 1 : 0,
+                device_change_flag: document.getElementById('device_changed').checked ? 1 : 0,
+                user_transaction_count: parseInt(document.getElementById('txn_count').value),
+                user_id: document.getElementById('user_id').value,
+                ip_address: document.getElementById('ip_address').value,
+                device_id: document.getElementById('device_id').value,
+                timestamp: new Date().toISOString()
+            };
+            
+            // Validate required fields
+            if (!transaction.user_id || !transaction.ip_address || !transaction.device_id) {
+                alert('Please fill in all required fields!');
+                return;
+            }
+            
+            fetch('/predict', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(transaction)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 200) {
+                    displayResults(data.result);
+                } else {
+                    document.getElementById('results').innerHTML = `
+                        <p class="error">Error: ${data.error}</p>
+                    `;
+                }
+            })
+            .catch(error => {
+                document.getElementById('results').innerHTML = `
+                    <p class="error">Evaluation failed: ${error.message}</p>
+                `;
+            });
+        }
+        
+        function displayResults(result) {
+            const isFraud = result.prediction === 1;
+            const topFeatures = result.shap_values 
+                ? Object.entries(result.shap_values.values)
+                      .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+                      .slice(0, 3)
+                      .map(([idx, val]) => ({
+                          name: result.shap_values.feature_names[idx],
+                          impact: val
+                      }))
+                : [];
+            
+            let html = `
+                <h3 class="${isFraud ? 'fraud' : 'legit'}">
+                    ${isFraud ? 'FRAUD DETECTED' : 'Legitimate Transaction'}
+                </h3>
+                <p>Probability: <strong>${(result.probability * 100).toFixed(2)}%</strong></p>
+                <p>Threshold: ${(result.threshold_used * 100).toFixed(2)}%</p>
+                <p>Model Version: ${result.model_version}</p>
+                
+                <h4>Key Factors</h4>
+                <ul>
+                    ${topFeatures.map(f => `
+                        <li>${f.name}: ${f.impact > 0 ? '+' : ''}${f.impact.toFixed(4)}</li>
+                    `).join('')}
+                </ul>
+                
+                <h4>Behavioral Anomalies</h4>
+                ${result.behavioral_anomalies && result.behavioral_anomalies.length
+                    ? `<ul>${result.behavioral_anomalies.map(a => `<li>⚠️ ${a}</li>`).join('')}</ul>`
+                    : '<p>No significant anomalies detected</p>'}
+                
+                <h4>Processing Warnings</h4>
+                ${result.warnings && result.warnings.length
+                    ? `<ul>${result.warnings.map(w => `<li>⚠️ ${w}</li>`).join('')}</ul>`
+                    : '<p>No warnings</p>'}
+            `;
+            
+            document.getElementById('results').innerHTML = html;
+        }
+    </script>
+</body>
+</html>
