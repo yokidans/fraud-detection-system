@@ -1,0 +1,1832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise Fraud Detection Dashboard - Enhanced</title>
+    
+    <!-- CSS Libraries -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    
+    <!-- JS Libraries -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/luxon@3.0.1"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.2.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-streaming@2.0.0"></script>
+    
+    <style>
+        :root {
+            --fraud-color: #e74c3c;
+            --legit-color: #2ecc71;
+            --warning-color: #f39c12;
+            --dark-color: #2c3e50;
+            --light-color: #ecf0f1;
+            --info-color: #3498db;
+            --anomaly-color: #9b59b6;
+        }
+        
+        * {
+            box-sizing: border-box;
+        }
+        
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 0; 
+            padding: 0; 
+            background-color: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .header {
+            background-color: var(--dark-color);
+            color: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .container { 
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto auto;
+            gap: 20px;
+            padding: 20px;
+        }
+        
+        @media (max-width: 1200px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .panel { 
+            background: white;
+            border-radius: 8px; 
+            padding: 20px; 
+            box-shadow: 0 2px 15px rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .panel:hover {
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+        
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .panel-title {
+            margin: 0;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .panel-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .panel.fraud { 
+            border-left: 5px solid var(--fraud-color);
+            background-color: rgba(231, 76, 60, 0.05);
+        }
+        
+        .panel.legit { 
+            border-left: 5px solid var(--legit-color);
+            background-color: rgba(46, 204, 113, 0.05);
+        }
+        
+        .panel.suspicious {
+            border-left: 5px solid var(--warning-color);
+            background-color: rgba(243, 156, 18, 0.05);
+        }
+        
+        .panel.info {
+            border-left: 5px solid var(--info-color);
+            background-color: rgba(52, 152, 219, 0.05);
+        }
+        
+        .panel.anomaly {
+            border-left: 5px solid var(--anomaly-color);
+            background-color: rgba(155, 89, 182, 0.05);
+        }
+        
+        /* New Grid Layout */
+        #input-panel {
+            grid-column: 1;
+            grid-row: 1;
+        }
+        
+        #result-panel {
+            grid-column: 2;
+            grid-row: 1 / span 2;
+        }
+        
+        #monitoring-panel {
+            grid-column: 1;
+            grid-row: 2;
+        }
+        
+        /* Enhanced Risk Meter */
+        .risk-meter-container {
+            margin: 15px 0;
+        }
+        
+        .risk-meter-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 5px;
+            font-size: 0.8rem;
+            color: #7f8c8d;
+        }
+        
+        .risk-meter {
+            height: 10px;
+            background: linear-gradient(to right, var(--legit-color), var(--warning-color), var(--fraud-color));
+            border-radius: 5px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .risk-indicator {
+            position: absolute;
+            top: -3px;
+            width: 3px;
+            height: 16px;
+            background: black;
+            z-index: 2;
+            transform: translateX(-50%);
+        }
+        
+        /* Enhanced Feature Importance */
+        .feature-importance-item {
+            margin-bottom: 12px;
+        }
+        
+        .feature-name {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        
+        .feature-bar-container {
+            height: 8px;
+            background: #eee;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .feature-bar {
+            height: 100%;
+            border-radius: 4px;
+        }
+        
+        .feature-positive {
+            background-color: var(--fraud-color);
+        }
+        
+        .feature-negative {
+            background-color: var(--legit-color);
+        }
+        
+        /* Enhanced Tables */
+        .feature-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        
+        .feature-table th, 
+        .feature-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .feature-table th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+        }
+        
+        .feature-table tr:hover {
+            background-color: #f5f7fa;
+        }
+        
+        /* Enhanced Inputs */
+        .input-group {
+            margin-bottom: 15px;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #2c3e50;
+        }
+        
+        .input-control {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+        }
+        
+        .input-control:focus {
+            border-color: var(--dark-color);
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(44, 62, 80, 0.1);
+        }
+        
+        .input-control.error {
+            border-color: var(--fraud-color);
+        }
+        
+        /* Enhanced Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 16px;
+            border: none;
+            border-radius: 4px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.95rem;
+        }
+        
+        .btn-primary {
+            background-color: var(--dark-color);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #1a252f;
+            transform: translateY(-1px);
+        }
+        
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+        
+        .btn-danger {
+            background-color: var(--fraud-color);
+            color: white;
+        }
+        
+        .btn-warning {
+            background-color: var(--warning-color);
+            color: white;
+        }
+        
+        .btn-success {
+            background-color: var(--legit-color);
+            color: white;
+        }
+        
+        .btn-icon {
+            padding: 8px;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+        }
+        
+        /* Enhanced Tabs */
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 15px;
+        }
+        
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+            font-weight: 500;
+            position: relative;
+        }
+        
+        .tab:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .tab.active {
+            border-bottom-color: var(--dark-color);
+            font-weight: 600;
+            color: var(--dark-color);
+        }
+        
+        .tab-badge {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            background-color: var(--fraud-color);
+            color: white;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            font-size: 0.7rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        /* Enhanced Alerts */
+        .alert {
+            padding: 12px 15px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .alert-fraud {
+            background-color: rgba(231, 76, 60, 0.15);
+            border-left: 4px solid var(--fraud-color);
+            color: #c0392b;
+        }
+        
+        .alert-legit {
+            background-color: rgba(46, 204, 113, 0.15);
+            border-left: 4px solid var(--legit-color);
+            color: #27ae60;
+        }
+        
+        .alert-warning {
+            background-color: rgba(243, 156, 18, 0.15);
+            border-left: 4px solid var(--warning-color);
+            color: #d35400;
+        }
+        
+        .alert-error {
+            background-color: rgba(231, 76, 60, 0.15);
+            border-left: 4px solid var(--fraud-color);
+            color: #c0392b;
+        }
+        
+        .alert-info {
+            background-color: rgba(52, 152, 219, 0.15);
+            border-left: 4px solid var(--info-color);
+            color: #2980b9;
+        }
+        
+        .alert-anomaly {
+            background-color: rgba(155, 89, 182, 0.15);
+            border-left: 4px solid var(--anomaly-color);
+            color: #8e44ad;
+        }
+        
+        /* Enhanced Charts */
+        .chart-container {
+            width: 100%;
+            height: 300px;
+            margin: 15px 0;
+        }
+        
+        /* Enhanced Loading State */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        
+        .loading-overlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top-color: var(--dark-color);
+            animation: spin 1s linear infinite;
+            margin-bottom: 10px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Enhanced History Items */
+        .history-item {
+            padding: 12px 15px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .history-item:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .history-item.fraud {
+            border-left: 3px solid var(--fraud-color);
+        }
+        
+        .history-item.legit {
+            border-left: 3px solid var(--legit-color);
+        }
+        
+        .history-item.suspicious {
+            border-left: 3px solid var(--warning-color);
+        }
+        
+        .history-item-anomaly {
+            border-left: 3px solid var(--anomaly-color);
+        }
+        
+        .history-item-content {
+            flex: 1;
+        }
+        
+        .history-item-meta {
+            display: flex;
+            gap: 10px;
+            font-size: 0.8rem;
+            color: #7f8c8d;
+        }
+        
+        .history-item-actions {
+            display: flex;
+            gap: 5px;
+        }
+        
+        /* Enhanced Tooltips */
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            cursor: help;
+        }
+        
+        .tooltip .tooltip-text {
+            visibility: hidden;
+            width: 200px;
+            background-color: var(--dark-color);
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 8px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.85rem;
+            font-weight: normal;
+        }
+        
+        .tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+        
+        /* Responsive Adjustments */
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto auto auto;
+            }
+            
+            #result-panel {
+                grid-column: 1;
+                grid-row: 2;
+            }
+            
+            #monitoring-panel {
+                grid-column: 1;
+                grid-row: 3;
+            }
+            
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+            
+            .header-actions {
+                width: 100%;
+                justify-content: space-between;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>
+            <i class="bi bi-shield-lock"></i>
+            Enterprise Fraud Detection Dashboard
+        </h1>
+        <div class="header-actions">
+            <button class="btn btn-primary" id="refresh-model">
+                <i class="bi bi-arrow-clockwise"></i>
+                Refresh Model
+            </button>
+            <button class="btn btn-primary" id="export-data">
+                <i class="bi bi-download"></i>
+                Export Data
+            </button>
+            <button class="btn btn-primary" id="settings-btn">
+                <i class="bi bi-gear"></i>
+                Settings
+            </button>
+        </div>
+    </div>
+    
+    <div class="container">
+        <!-- Input Panel -->
+        <div class="panel" id="input-panel">
+            <div class="panel-header">
+                <h2 class="panel-title">
+                    <i class="bi bi-input-cursor-text"></i>
+                    Transaction Evaluation
+                </h2>
+                <div class="panel-actions">
+                    <button class="btn btn-icon" id="clear-form">
+                        <i class="bi bi-x-circle"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="alert" id="input-alert"></div>
+            
+            <form id="transaction-form">
+                <table class="feature-table">
+                    <thead>
+                        <tr>
+                            <th>Feature</th>
+                            <th>Value</th>
+                            <th>Risk Indicator</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Amount ($)</td>
+                            <td>
+                                <input type="number" class="input-control" name="amount" step="0.01" min="0" placeholder="0.00">
+                            </td>
+                            <td>
+                                <div class="risk-meter-container">
+                                    <div class="risk-meter" data-feature="amount">
+                                        <div class="risk-indicator"></div>
+                                    </div>
+                                    <div class="risk-meter-labels">
+                                        <span>Low</span>
+                                        <span>Medium</span>
+                                        <span>High</span>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Time Since Last (min)</td>
+                            <td>
+                                <input type="number" class="input-control" name="time_since_last_transaction" min="0" placeholder="1440">
+                            </td>
+                            <td>
+                                <div class="risk-meter-container">
+                                    <div class="risk-meter" data-feature="time_since_last_transaction">
+                                        <div class="risk-indicator"></div>
+                                    </div>
+                                    <div class="risk-meter-labels">
+                                        <span>High</span>
+                                        <span>Medium</span>
+                                        <span>Low</span>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Purchase Frequency (24h)</td>
+                            <td>
+                                <input type="number" class="input-control" name="purchase_frequency_24h" min="0" placeholder="1">
+                            </td>
+                            <td>
+                                <div class="risk-meter-container">
+                                    <div class="risk-meter" data-feature="purchase_frequency_24h">
+                                        <div class="risk-indicator"></div>
+                                    </div>
+                                    <div class="risk-meter-labels">
+                                        <span>Low</span>
+                                        <span>Medium</span>
+                                        <span>High</span>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Foreign IP</td>
+                            <td>
+                                <select class="input-control feature-select" name="is_foreign_ip">
+                                    <option value="0">No</option>
+                                    <option value="1">Yes</option>
+                                </select>
+                            </td>
+                            <td>
+                                <div class="risk-meter-container">
+                                    <div class="risk-meter" data-feature="is_foreign_ip">
+                                        <div class="risk-indicator"></div>
+                                    </div>
+                                    <div class="risk-meter-labels">
+                                        <span>Low</span>
+                                        <span>High</span>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Device Changed</td>
+                            <td>
+                                <select class="input-control feature-select" name="device_change_flag">
+                                    <option value="0">No</option>
+                                    <option value="1">Yes</option>
+                                </select>
+                            </td>
+                            <td>
+                                <div class="risk-meter-container">
+                                    <div class="risk-meter" data-feature="device_change_flag">
+                                        <div class="risk-indicator"></div>
+                                    </div>
+                                    <div class="risk-meter-labels">
+                                        <span>Low</span>
+                                        <span>High</span>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>User Transaction Count</td>
+                            <td>
+                                <input type="number" class="input-control" name="user_transaction_count" min="0" placeholder="10">
+                            </td>
+                            <td>
+                                <div class="risk-meter-container">
+                                    <div class="risk-meter" data-feature="user_transaction_count">
+                                        <div class="risk-indicator"></div>
+                                    </div>
+                                    <div class="risk-meter-labels">
+                                        <span>High</span>
+                                        <span>Medium</span>
+                                        <span>Low</span>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <button type="submit" class="btn btn-primary" id="evaluate-btn">
+                    <i class="bi bi-shield-check"></i>
+                    Evaluate Transaction
+                </button>
+            </form>
+            
+            <div class="loading-overlay" id="input-loading">
+                <div class="spinner"></div>
+                <p>Analyzing transaction...</p>
+            </div>
+        </div>
+        
+        <!-- Result Panel -->
+        <div class="panel" id="result-panel">
+            <div class="panel-header">
+                <h2 class="panel-title">
+                    <i class="bi bi-graph-up"></i>
+                    Prediction Results
+                </h2>
+                <div class="panel-actions">
+                    <button class="btn btn-icon" id="fullscreen-results">
+                        <i class="bi bi-fullscreen"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="tabs">
+                <div class="tab active" data-tab="prediction">
+                    <i class="bi bi-speedometer2"></i>
+                    Prediction
+                </div>
+                <div class="tab" data-tab="explanation">
+                    <i class="bi bi-lightbulb"></i>
+                    Explanation
+                </div>
+                <div class="tab" data-tab="history">
+                    <i class="bi bi-clock-history"></i>
+                    History
+                    <span class="tab-badge" id="history-badge">0</span>
+                </div>
+                <div class="tab" data-tab="monitoring">
+                    <i class="bi bi-bar-chart-line"></i>
+                    Monitoring
+                </div>
+            </div>
+            
+            <div class="tab-content active" id="prediction-tab">
+                <div class="alert" id="result-alert"></div>
+                
+                <div id="prediction-result">
+                    <div style="text-align: center; padding: 40px 20px;">
+                        <h3>Submit a transaction to evaluate</h3>
+                        <p>Fill in the transaction details and click "Evaluate" to get a fraud risk assessment</p>
+                    </div>
+                </div>
+                
+                <div class="risk-meter-container">
+                    <div class="risk-meter" id="probability-meter">
+                        <div class="risk-indicator" id="probability-indicator"></div>
+                    </div>
+                    <div class="risk-meter-labels">
+                        <span>0% (Legitimate)</span>
+                        <span>50%</span>
+                        <span>100% (Fraud)</span>
+                    </div>
+                </div>
+                
+                <div id="shap-plot" class="chart-container"></div>
+                
+                <div id="anomaly-detection" style="display: none;">
+                    <h3>
+                        <i class="bi bi-exclamation-triangle"></i>
+                        Behavioral Anomalies Detected
+                    </h3>
+                    <div id="anomaly-list"></div>
+                </div>
+                
+                <div id="decision-actions" class="decision-actions" style="display: none;">
+                    <button class="btn btn-success" id="approve-btn">
+                        <i class="bi bi-check-circle"></i>
+                        Approve
+                    </button>
+                    <button class="btn btn-warning" id="review-btn">
+                        <i class="bi bi-search"></i>
+                        Manual Review
+                    </button>
+                    <button class="btn btn-danger" id="block-btn">
+                        <i class="bi bi-x-circle"></i>
+                        Block
+                    </button>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="explanation-tab">
+                <div id="explanation">
+                    <p>Detailed explanation will appear here after evaluating a transaction.</p>
+                </div>
+                
+                <div id="feature-impacts">
+                    <h3>
+                        <i class="bi bi-list-check"></i>
+                        Feature Impacts
+                    </h3>
+                    <div id="feature-impacts-list"></div>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="history-tab">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3>
+                        <i class="bi bi-clock-history"></i>
+                        Recent Evaluations
+                    </h3>
+                    <button class="btn btn-primary" id="clear-history" style="width: auto;">
+                        <i class="bi bi-trash"></i>
+                        Clear History
+                    </button>
+                </div>
+                <div id="history-list">
+                    <p>No history available. Evaluated transactions will appear here.</p>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="monitoring-tab">
+                <div class="chart-container">
+                    <canvas id="real-time-chart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <canvas id="performance-chart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Monitoring Panel -->
+        <div class="panel" id="monitoring-panel">
+            <div class="panel-header">
+                <h2 class="panel-title">
+                    <i class="bi bi-graph-up-arrow"></i>
+                    System Monitoring
+                </h2>
+                <div class="panel-actions">
+                    <button class="btn btn-icon" id="refresh-monitoring">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i>
+                Real-time system metrics and performance indicators
+            </div>
+            
+            <div class="chart-container">
+                <canvas id="throughput-chart"></canvas>
+            </div>
+            
+            <div class="chart-container">
+                <canvas id="latency-chart"></canvas>
+            </div>
+            
+            <div class="system-stats">
+                <h3>
+                    <i class="bi bi-speedometer2"></i>
+                    Key Metrics
+                </h3>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="tps-value">0</div>
+                        <div class="stat-label">Transactions/sec</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="fraud-rate-value">0%</div>
+                        <div class="stat-label">Fraud Rate</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="avg-latency-value">0ms</div>
+                        <div class="stat-label">Avg Latency</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="model-version-value">N/A</div>
+                        <div class="stat-label">Model Version</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Settings Modal -->
+    <div class="modal" id="settings-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>
+                    <i class="bi bi-gear"></i>
+                    System Settings
+                </h3>
+                <button class="btn btn-icon" id="close-settings">
+                    <i class="bi bi-x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="threshold-adjustment">Risk Threshold Adjustment</label>
+                    <input type="range" class="input-control" id="threshold-adjustment" min="0.1" max="0.9" step="0.05" value="0.5">
+                    <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+                        <span>More Conservative (0.1)</span>
+                        <span>Balanced (0.5)</span>
+                        <span>More Aggressive (0.9)</span>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="enable-explanations" checked>
+                        Enable Detailed Explanations
+                    </label>
+                </div>
+                
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="enable-anomaly-detection" checked>
+                        Enable Behavioral Anomaly Detection
+                    </label>
+                </div>
+                
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="enable-real-time-monitoring" checked>
+                        Enable Real-time Monitoring
+                    </label>
+                </div>
+                
+                <button class="btn btn-primary" id="save-settings">
+                    <i class="bi bi-save"></i>
+                    Save Settings
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Enhanced JavaScript implementation
+        class FraudDetectionDashboard {
+            constructor() {
+                this.modelMetadata = {
+                    version: "1.0.0",
+                    performance: {
+                        precision: 0.0,
+                        recall: 0.0,
+                        f1: 0.0,
+                        auc: 0.0
+                    },
+                    featureWeights: {}
+                };
+                
+                this.transactionHistory = JSON.parse(localStorage.getItem('fraudDetectionHistory')) || [];
+                this.currentPrediction = null;
+                this.apiTimeout = null;
+                this.realTimeData = [];
+                this.initialize();
+            }
+            
+            initialize() {
+                this.setupUI();
+                this.setupEventListeners();
+                this.loadModelMetadata();
+                this.initializeCharts();
+                this.startRealTimeUpdates();
+            }
+            
+            setupUI() {
+                // Initialize select2 dropdowns
+                $('.feature-select').select2({
+                    minimumResultsForSearch: -1,
+                    width: '100%'
+                });
+                
+                // Set default values
+                const DEFAULT_VALUES = {
+                    amount: 0,
+                    time_since_last_transaction: 1440,
+                    purchase_frequency_24h: 1,
+                    is_foreign_ip: 0,
+                    device_change_flag: 0,
+                    user_transaction_count: 10
+                };
+                
+                for (const [name, value] of Object.entries(DEFAULT_VALUES)) {
+                    const $input = $(`input[name="${name}"]`);
+                    if ($input.length) {
+                        $input.val(value);
+                    } else {
+                        $(`select[name="${name}"]`).val(value).trigger('change');
+                    }
+                }
+                
+                // Update history badge
+                this.updateHistoryBadge();
+            }
+            
+            setupEventListeners() {
+                // Tab switching
+                $('.tab').click((e) => {
+                    const tab = $(e.currentTarget);
+                    $('.tab').removeClass('active');
+                    tab.addClass('active');
+                    
+                    const tabId = tab.data('tab');
+                    $('.tab-content').removeClass('active');
+                    $(`#${tabId}-tab`).addClass('active');
+                });
+                
+                // Form submission
+                $('#transaction-form').submit((e) => {
+                    e.preventDefault();
+                    this.evaluateTransaction();
+                });
+                
+                // Clear history
+                $('#clear-history').click(() => {
+                    if (confirm('Are you sure you want to clear all history?')) {
+                        this.transactionHistory = [];
+                        localStorage.setItem('fraudDetectionHistory', JSON.stringify(this.transactionHistory));
+                        this.updateHistoryTab();
+                        this.showResultAlert('History cleared', 'info');
+                        this.updateHistoryBadge();
+                    }
+                });
+                
+                // Clear form
+                $('#clear-form').click(() => {
+                    $('#transaction-form')[0].reset();
+                    this.hideInputAlert();
+                });
+                
+                // Feature input validation
+                $('input').on('input', (e) => {
+                    const input = $(e.currentTarget);
+                    const name = input.attr('name');
+                    const value = input.val();
+                    
+                    if (value === '' || isNaN(value)) {
+                        input.addClass('error');
+                        return;
+                    }
+                    
+                    input.removeClass('error');
+                    
+                    if (name in this.RISK_METER_CONFIG) {
+                        this.updateRiskMeter(name, parseFloat(value));
+                    }
+                    
+                    if (name === 'amount' && parseFloat(value) > 100000) {
+                        this.showInputAlert('Amount exceeds maximum allowed value of $100,000', 'warning');
+                    } else {
+                        this.hideInputAlert();
+                    }
+                });
+                
+                // Decision buttons
+                $('#approve-btn').click(() => {
+                    if (this.currentPrediction) {
+                        this.logDecision('approved', this.currentPrediction);
+                        this.showResultAlert('Transaction approved', 'legit');
+                    }
+                });
+                
+                $('#block-btn').click(() => {
+                    if (this.currentPrediction) {
+                        this.logDecision('blocked', this.currentPrediction);
+                        this.showResultAlert('Transaction blocked', 'fraud');
+                    }
+                });
+                
+                $('#review-btn').click(() => {
+                    if (this.currentPrediction) {
+                        this.logDecision('review', this.currentPrediction);
+                        this.showResultAlert('Sent for manual review', 'warning');
+                    }
+                });
+                
+                // Header buttons
+                $('#refresh-model').click(() => {
+                    this.refreshModel();
+                });
+                
+                $('#export-data').click(() => {
+                    this.exportData();
+                });
+                
+                $('#settings-btn').click(() => {
+                    this.showSettingsModal();
+                });
+                
+                $('#close-settings').click(() => {
+                    this.hideSettingsModal();
+                });
+                
+                // Settings
+                $('#save-settings').click(() => {
+                    this.saveSettings();
+                });
+                
+                // Fullscreen
+                $('#fullscreen-results').click(() => {
+                    this.toggleFullscreen();
+                });
+            }
+            
+            evaluateTransaction() {
+                $('#result-alert').hide();
+                this.hideInputAlert();
+                
+                const formData = {};
+                let hasErrors = false;
+                
+                $('#transaction-form').find('input, select').each((_, el) => {
+                    const $input = $(el);
+                    const name = $input.attr('name');
+                    let value = $input.val();
+                    
+                    if (value === '') {
+                        value = this.DEFAULT_VALUES[name];
+                        if ($input.is('input')) {
+                            $input.val(value);
+                        }
+                    }
+                    
+                    if ($input.is('input')) {
+                        value = parseFloat(value);
+                        if (isNaN(value)) {
+                            $input.addClass('error');
+                            hasErrors = true;
+                            return;
+                        }
+                    } else {
+                        value = parseInt(value);
+                    }
+                    
+                    formData[name] = value;
+                });
+                
+                if (hasErrors) {
+                    this.showResultAlert('Please fix the highlighted errors', 'error');
+                    return;
+                }
+                
+                $('#input-loading').addClass('active');
+                $('#evaluate-btn').prop('disabled', true);
+                
+                if (this.apiTimeout) clearTimeout(this.apiTimeout);
+                this.apiTimeout = setTimeout(() => {
+                    this.handleApiTimeout();
+                }, 15000);
+                
+                formData.timestamp = new Date().toISOString();
+                formData.client_ip = "192.168.1.1";
+                formData.user_agent = navigator.userAgent;
+                
+                $.ajax({
+                    url: '/predict',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify(formData),
+                    success: (response) => {
+                        clearTimeout(this.apiTimeout);
+                        this.handlePredictionResponse(response, formData);
+                    },
+                    error: (xhr) => {
+                        clearTimeout(this.apiTimeout);
+                        this.handleApiError(xhr);
+                    },
+                    complete: () => {
+                        $('#input-loading').removeClass('active');
+                        $('#evaluate-btn').prop('disabled', false);
+                    }
+                });
+            }
+            
+            handlePredictionResponse(response, formData) {
+                if (response.status === 'success') {
+                    this.currentPrediction = response;
+                    this.updatePredictionUI(response);
+                    this.addToHistory(formData, response);
+                    
+                    if (response.warnings?.length > 0) {
+                        this.showResultAlert(
+                            `Processed with warnings: ${response.warnings.join('; ')}`, 
+                            'warning'
+                        );
+                    }
+                } else {
+                    this.showResultAlert(
+                        `Error: ${response.message || 'Unknown error'}`,
+                        'error'
+                    );
+                }
+            }
+            
+            updatePredictionUI(data) {
+                const resultPanel = $('#result-panel');
+                const predictionDiv = $('#prediction-result');
+                const explanationDiv = $('#explanation');
+                const impactsDiv = $('#feature-impacts-list');
+                const anomalyDiv = $('#anomaly-detection');
+                const anomalyList = $('#anomaly-list');
+                
+                // Determine risk level
+                let riskClass = 'legit';
+                let riskLabel = 'LEGITIMATE TRANSACTION';
+                let riskColor = 'var(--legit-color)';
+                
+                if (data.prediction === 1) {
+                    riskClass = 'fraud';
+                    riskLabel = 'FRAUD DETECTED';
+                    riskColor = 'var(--fraud-color)';
+                } else if (data.probability > 0.6) {
+                    riskClass = 'suspicious';
+                    riskLabel = 'SUSPICIOUS TRANSACTION';
+                    riskColor = 'var(--warning-color)';
+                }
+                
+                // Update panel styling
+                resultPanel.removeClass('fraud legit suspicious').addClass(riskClass);
+                
+                // Update prediction result
+                predictionDiv.html(`
+                    <div style="text-align: center; padding: 20px;">
+                        <h3 style="color: ${riskColor}; font-size: 24px; margin-bottom: 10px;">
+                            <i class="bi bi-${riskClass === 'fraud' ? 'exclamation-triangle' : 
+                              riskClass === 'suspicious' ? 'question-circle' : 'check-circle'}"></i>
+                            ${riskLabel}
+                        </h3>
+                        <div style="font-size: 18px; margin-bottom: 5px;">
+                            Probability: <strong>${(data.probability * 100).toFixed(1)}%</strong>
+                        </div>
+                        <div style="color: #7f8c8d; margin-bottom: 20px;">
+                            Threshold: ${(data.threshold_used * 100).toFixed(0)}%
+                        </div>
+                    </div>
+                `);
+                
+                // Show appropriate alert
+                if (data.prediction === 1) {
+                    this.showResultAlert('High fraud probability detected!', 'fraud');
+                } else if (riskClass === 'suspicious') {
+                    this.showResultAlert('Moderate risk detected - review recommended', 'warning');
+                } else {
+                    this.showResultAlert('Transaction appears legitimate', 'legit');
+                }
+                
+                // Update probability meter
+                $('#probability-indicator').css('left', `${data.probability * 100}%`);
+                
+                // Show decision buttons
+                $('#decision-actions').show();
+                
+                // Update explanation
+                explanationDiv.html(`
+                    <h3>
+                        <i class="bi bi-lightbulb"></i>
+                        Decision Explanation
+                    </h3>
+                    <p>${data.explanation || 'No detailed explanation available for this transaction.'}</p>
+                `);
+                
+                // Update feature impacts
+                impactsDiv.empty();
+                if (data.shap_values?.feature_names && data.shap_values.values) {
+                    for (let i = 0; i < Math.min(data.shap_values.feature_names.length, 10); i++) {
+                        const feature = data.shap_values.feature_names[i];
+                        const value = data.shap_values.values[i];
+                        const absValue = Math.abs(value);
+                        const width = Math.min(absValue * 100, 100);
+                        const direction = value > 0 ? 'increased risk' : 'decreased risk';
+                        const impactClass = value > 0 ? 'feature-positive' : 'feature-negative';
+                        
+                        impactsDiv.append(`
+                            <div class="feature-importance-item">
+                                <div class="feature-name">
+                                    <span>${feature.replace(/_/g, ' ').toUpperCase()}</span>
+                                    <span>${value > 0 ? '+' : ''}${value.toFixed(4)}</span>
+                                </div>
+                                <div class="feature-bar-container">
+                                    <div class="feature-bar ${impactClass}" style="width: ${width}%"></div>
+                                </div>
+                            </div>
+                        `);
+                    }
+                } else {
+                    impactsDiv.html('<p>No feature impact data available</p>');
+                }
+                
+                // Update anomaly detection
+                if (data.behavioral_anomalies?.length > 0) {
+                    anomalyDiv.show();
+                    anomalyList.empty();
+                    
+                    data.behavioral_anomalies.forEach(anomaly => {
+                        anomalyList.append(`
+                            <div class="alert alert-anomaly">
+                                <i class="bi bi-exclamation-triangle"></i>
+                                ${anomaly}
+                            </div>
+                        `);
+                    });
+                } else {
+                    anomalyDiv.hide();
+                }
+                
+                // Update SHAP plot if available
+                if (data.shap_values && $('#enable-explanations').is(':checked')) {
+                    this.updateShapPlot(data.shap_values, data.probability);
+                } else {
+                    $('#shap-plot').html('<p>Enable explanations in settings to view SHAP plot</p>');
+                }
+            }
+            
+            updateShapPlot(shapData, probability) {
+                try {
+                    const features = shapData.feature_names
+                        .map(f => f.replace(/_/g, ' ').toUpperCase())
+                        .slice(0, 10);
+                    const values = shapData.values.slice(0, 10);
+                    
+                    const plotData = [{
+                        type: 'bar',
+                        orientation: 'h',
+                        y: features,
+                        x: values,
+                        text: values.map(v => v.toFixed(4)),
+                        textposition: 'auto',
+                        marker: {
+                            color: values.map(v => v > 0 ? 'rgba(231, 76, 60, 0.8)' : 'rgba(46, 204, 113, 0.8)')
+                        }
+                    }];
+                    
+                    const layout = {
+                        title: `Top Feature Impacts (Probability: ${(probability * 100).toFixed(1)}%)`,
+                        xaxis: {
+                            title: 'Impact on Prediction (log-odds)'
+                        },
+                        yaxis: {
+                            automargin: true
+                        },
+                        margin: {
+                            l: 150,
+                            r: 50,
+                            b: 50,
+                            t: 50,
+                            pad: 4
+                        },
+                        showlegend: false
+                    };
+                    
+                    Plotly.newPlot('shap-plot', plotData, layout);
+                } catch (e) {
+                    console.error('SHAP plot error:', e);
+                    $('#shap-plot').html('<p>Could not generate SHAP explanation</p>');
+                }
+            }
+            
+            addToHistory(formData, predictionData) {
+                const entry = {
+                    id: Date.now(),
+                    timestamp: new Date().toISOString(),
+                    formData: formData,
+                    predictionData: predictionData
+                };
+                
+                this.transactionHistory.unshift(entry);
+                if (this.transactionHistory.length > 50) {
+                    this.transactionHistory.pop();
+                }
+                
+                localStorage.setItem('fraudDetectionHistory', JSON.stringify(this.transactionHistory));
+                this.updateHistoryTab();
+                this.updateHistoryBadge();
+            }
+            
+            updateHistoryTab() {
+                const container = $('#history-list');
+                container.empty();
+                
+                if (this.transactionHistory.length === 0) {
+                    container.append('<p>No history available. Evaluated transactions will appear here.</p>');
+                    return;
+                }
+                
+                this.transactionHistory.forEach(entry => {
+                    const pred = entry.predictionData;
+                    const riskClass = pred.prediction === 1 ? 'fraud' : 
+                                    pred.probability > 0.6 ? 'suspicious' : 'legit';
+                    const hasAnomalies = pred.behavioral_anomalies?.length > 0;
+                    
+                    container.append(`
+                        <div class="history-item ${riskClass} ${hasAnomalies ? 'history-item-anomaly' : ''}" data-id="${entry.id}">
+                            <div class="history-item-content">
+                                <div style="display: flex; justify-content: space-between;">
+                                    <strong>${moment(entry.timestamp).format('MMM D, h:mm A')}</strong>
+                                    <span style="font-weight: bold; color: ${riskClass === 'fraud' ? 'var(--fraud-color)' : 
+                                      riskClass === 'suspicious' ? 'var(--warning-color)' : 'var(--legit-color)'}">
+                                        ${pred.prediction === 1 ? 'FRAUD' : 'LEGIT'} (${(pred.probability * 100).toFixed(1)}%)
+                                    </span>
+                                </div>
+                                <div class="history-item-meta">
+                                    <span>Amount: $${entry.formData.amount?.toFixed(2) || '0.00'}</span>
+                                    <span>IP: ${entry.formData.is_foreign_ip ? 'Foreign' : 'Domestic'}</span>
+                                    <span>TXs: ${entry.formData.user_transaction_count || '0'}</span>
+                                </div>
+                            </div>
+                            ${hasAnomalies ? '<i class="bi bi-exclamation-triangle" style="color: var(--anomaly-color);"></i>' : ''}
+                        </div>
+                    `);
+                });
+                
+                $('.history-item').click((e) => {
+                    const id = $(e.currentTarget).data('id');
+                    const entry = this.transactionHistory.find(e => e.id === id);
+                    if (entry) {
+                        this.currentPrediction = entry.predictionData;
+                        this.updatePredictionUI(entry.predictionData);
+                        
+                        for (const key in entry.formData) {
+                            if (key in entry.formData && $(`input[name="${key}"]`).length) {
+                                $(`input[name="${key}"]`).val(entry.formData[key]);
+                                this.updateRiskMeter(key, entry.formData[key]);
+                            } else if (key in entry.formData && $(`select[name="${key}"]`).length) {
+                                $(`select[name="${key}"]`).val(entry.formData[key]).trigger('change');
+                                this.updateRiskMeter(key, entry.formData[key]);
+                            }
+                        }
+                    }
+                });
+            }
+            
+            updateHistoryBadge() {
+                const badge = $('#history-badge');
+                const count = this.transactionHistory.length;
+                
+                if (count > 0) {
+                    badge.text(count).show();
+                } else {
+                    badge.hide();
+                }
+            }
+            
+            initializeCharts() {
+                // Real-time transaction chart
+                this.realTimeChart = new Chart(
+                    document.getElementById('real-time-chart').getContext('2d'),
+                    {
+                        type: 'line',
+                        data: {
+                            datasets: [{
+                                label: 'Fraud Probability',
+                                borderColor: 'rgba(231, 76, 60, 0.8)',
+                                backgroundColor: 'rgba(231, 76, 60, 0.2)',
+                                borderWidth: 2,
+                                pointRadius: 0,
+                                data: []
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            scales: {
+                                x: {
+                                    type: 'realtime',
+                                    realtime: {
+                                        duration: 60000,
+                                        refresh: 1000,
+                                        delay: 1000,
+                                        onRefresh: chart => {
+                                            chart.data.datasets[0].data.push({
+                                                x: Date.now(),
+                                                y: this.realTimeData.length > 0 ? 
+                                                    this.realTimeData[this.realTimeData.length - 1].probability * 100 : 0
+                                            });
+                                        }
+                                    }
+                                },
+                                y: {
+                                    min: 0,
+                                    max: 100,
+                                    title: {
+                                        display: true,
+                                        text: 'Probability (%)'
+                                    }
+                                }
+                            },
+                            plugins: {
+                                legend: {
+                                    display: true
+                                },
+                                tooltip: {
+                                    mode: 'nearest',
+                                    intersect: false
+                                }
+                            }
+                        }
+                    }
+                );
+                
+                // Performance metrics chart
+                this.performanceChart = new Chart(
+                    document.getElementById('performance-chart').getContext('2d'),
+                    {
+                        type: 'bar',
+                        data: {
+                            labels: ['Precision', 'Recall', 'F1 Score', 'AUC'],
+                            datasets: [{
+                                label: 'Model Performance',
+                                data: [0, 0, 0, 0],
+                                backgroundColor: [
+                                    'rgba(52, 152, 219, 0.7)',
+                                    'rgba(155, 89, 182, 0.7)',
+                                    'rgba(46, 204, 113, 0.7)',
+                                    'rgba(241, 196, 15, 0.7)'
+                                ]
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            scales: {
+                                y: {
+                                    min: 0,
+                                    max: 1,
+                                    title: {
+                                        display: true,
+                                        text: 'Score'
+                                    }
+                                }
+                            }
+                        }
+                    }
+                );
+            }
+            
+            startRealTimeUpdates() {
+                setInterval(() => {
+                    // Simulate real-time data updates
+                    if (this.transactionHistory.length > 0) {
+                        const randomEntry = this.transactionHistory[
+                            Math.floor(Math.random() * this.transactionHistory.length)
+                        ];
+                        
+                        this.realTimeData.push({
+                            timestamp: new Date().toISOString(),
+                            probability: randomEntry.predictionData.probability
+                        });
+                        
+                        if (this.realTimeData.length > 60) {
+                            this.realTimeData.shift();
+                        }
+                    }
+                    
+                    // Update performance metrics
+                    if (this.modelMetadata.performance) {
+                        const perf = this.modelMetadata.performance;
+                        this.performanceChart.data.datasets[0].data = [
+                            perf.precision || 0,
+                            perf.recall || 0,
+                            perf.f1 || 0,
+                            perf.auc || 0
+                        ];
+                        this.performanceChart.update();
+                    }
+                    
+                    // Update stats
+                    $('#tps-value').text(`${(Math.random() * 10 + 5).toFixed(1)}`);
+                    $('#fraud-rate-value').text(`${(Math.random() * 5).toFixed(2)}%`);
+                    $('#avg-latency-value').text(`${(Math.random() * 50 + 20).toFixed(0)}ms`);
+                    $('#model-version-value').text(this.modelMetadata.version || 'N/A');
+                    
+                }, 1000);
+            }
+            
+            loadModelMetadata() {
+                // Simulate API call
+                setTimeout(() => {
+                    this.modelMetadata = {
+                        version: "1.2.0",
+                        trainedDate: "2023-06-15",
+                        performance: {
+                            precision: 0.92,
+                            recall: 0.85,
+                            f1: 0.88,
+                            auc: 0.96
+                        },
+                        featureWeights: {
+                            amount: 0.28,
+                            time_since_last_transaction: 0.22,
+                            is_foreign_ip: 0.18,
+                            device_change_flag: 0.15,
+                            purchase_frequency_24h: 0.12,
+                            user_transaction_count: 0.05
+                        }
+                    };
+                    
+                    $('#model-meta').html(`
+                        Model: v${this.modelMetadata.version} | 
+                        Trained: ${this.modelMetadata.trainedDate} | 
+                        AUC: ${this.modelMetadata.performance.auc.toFixed(2)} | 
+                        F1: ${this.modelMetadata.performance.f1.toFixed(2)}
+                    `);
+                }, 500);
+            }
+            
+            refreshModel() {
+                $('#input-loading').addClass('active');
+                
+                setTimeout(() => {
+                    this.loadModelMetadata();
+                    $('#input-loading').removeClass('active');
+                    this.showResultAlert('Model refreshed successfully', 'info');
+                }, 1000);
+            }
+            
+            exportData() {
+                const dataStr = JSON.stringify(this.transactionHistory, null, 2);
+                const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+                
+                const exportFileDefaultName = `fraud-detection-export-${new Date().toISOString()}.json`;
+                
+                const linkElement = document.createElement('a');
+                linkElement.setAttribute('href', dataUri);
+                linkElement.setAttribute('download', exportFileDefaultName);
+                linkElement.click();
+                
+                this.showResultAlert('Data exported successfully', 'info');
+            }
+            
+            showSettingsModal() {
+                $('#settings-modal').show();
+            }
+            
+            hideSettingsModal() {
+                $('#settings-modal').hide();
+            }
+            
+            saveSettings() {
+                const threshold = $('#threshold-adjustment').val();
+                const explanationsEnabled = $('#enable-explanations').is(':checked');
+                const anomalyDetectionEnabled = $('#enable-anomaly-detection').is(':checked');
+                const realTimeMonitoringEnabled = $('#enable-real-time-monitoring').is(':checked');
+                
+                localStorage.setItem('fraudDetectionSettings', JSON.stringify({
+                    threshold,
+                    explanationsEnabled,
+                    anomalyDetectionEnabled,
+                    realTimeMonitoringEnabled
+                }));
+                
+                this.showResultAlert('Settings saved', 'info');
+                this.hideSettingsModal();
+            }
+            
+            toggleFullscreen() {
+                const panel = $('#result-panel')[0];
+                if (!document.fullscreenElement) {
+                    panel.requestFullscreen().catch(err => {
+                        console.error(`Error attempting to enable fullscreen: ${err.message}`);
+                    });
+                } else {
+                    document.exitFullscreen();
+                }
+            }
+            
+            showResultAlert(message, type) {
+                const alert = $('#result-alert');
+                alert.removeClass('alert-fraud alert-legit alert-warning alert-error alert-info alert-anomaly')
+                     .addClass(`alert-${type}`)
+                     .html(`<i class="bi bi-${this.getIconForAlertType(type)}"></i> ${message}`)
+                     .show()
+                     .delay(5000)
+                     .fadeOut();
+            }
+            
+            showInputAlert(message, type) {
+                const alert = $('#input-alert');
+                alert.removeClass('alert-fraud alert-legit alert-warning alert-error alert-info alert-anomaly')
+                     .addClass(`alert-${type}`)
+                     .html(`<i class="bi bi-${this.getIconForAlertType(type)}"></i> ${message}`)
+                     .show();
+            }
+            
+            hideInputAlert() {
+                $('#input-alert').hide();
+            }
+            
+            getIconForAlertType(type) {
+                switch(type) {
+                    case 'fraud': return 'exclamation-triangle';
+                    case 'legit': return 'check-circle';
+                    case 'warning': return 'exclamation-circle';
+                    case 'error': return 'x-circle';
+                    case 'info': return 'info-circle';
+                    case 'anomaly': return 'exclamation-triangle';
+                    default: return 'info-circle';
+                }
+            }
+            
+            updateRiskMeter(feature, value) {
+                const meter = $(`.risk-meter[data-feature="${feature}"]`);
+                const indicator = meter.find('.risk-indicator');
+                const config = this.RISK_METER_CONFIG[feature];
+                
+                let percentage = 0;
+                
+                if (config.binary) {
+                    percentage = value * 100;
+                } else {
+                    const normalized = (value - config.min) / (config.max - config.min);
+                    percentage = Math.min(Math.max(normalized * 100, 0), 100);
+                    if (config.reverse) {
+                        percentage = 100 - percentage;
+                    }
+                }
+                
+                indicator.css('left', `${percentage}%`);
+            }
+            
+            logDecision(action, prediction) {
+                console.log(`Transaction ${action}:`, prediction);
+                this.showResultAlert(`Transaction marked as ${action}`, 'info');
+            }
+            
+            handleApiError(xhr) {
+                let errorMsg = 'API Error';
+                try {
+                    const errResponse = JSON.parse(xhr.responseText);
+                    errorMsg = errResponse.error || errResponse.message || errorMsg;
+                } catch (e) {
+                    console.error('Error parsing error response:', e);
+                }
+                
+                this.showResultAlert(
+                    `${errorMsg} (Status: ${xhr.status})`,
+                    'error'
+                );
+            }
+            
+            handleApiTimeout() {
+                this.showResultAlert(
+                    'Request timeout - please try again',
+                    'error'
+                );
+                $('#input-loading').removeClass('active');
+                $('#evaluate-btn').prop('disabled', false);
+            }
+            
+            get RISK_METER_CONFIG() {
+                return {
+                    amount: {
+                        min: 0,
+                        max: 5000,
+                        reverse: false
+                    },
+                    time_since_last_transaction: {
+                        min: 0,
+                        max: 1440,
+                        reverse: true
+                    },
+                    purchase_frequency_24h: {
+                        min: 0,
+                        max: 20,
+                        reverse: false
+                    },
+                    is_foreign_ip: {
+                        binary: true
+                    },
+                    device_change_flag: {
+                        binary: true
+                    },
+                    user_transaction_count: {
+                        min: 0,
+                        max: 100,
+                        reverse: true
+                    }
+                };
+            }
+            
+            get DEFAULT_VALUES() {
+                return {
+                    amount: 0,
+                    time_since_last_transaction: 1440,
+                    purchase_frequency_24h: 1,
+                    is_foreign_ip: 0,
+                    device_change_flag: 0,
+                    user_transaction_count: 10
+                };
+            }
+        }
+        
+        // Initialize the dashboard when DOM is ready
+        $(document).ready(() => {
+            new FraudDetectionDashboard();
+        });
+    </script>
+</body>
+</html>

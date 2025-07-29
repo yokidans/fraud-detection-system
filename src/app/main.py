@@ -1,154 +1,80 @@
-from flask import Flask, render_template, request, jsonify
-import dash
-from dash import dcc, html
-from dash.dependencies import Input, Output
-import plotly.express as px
-import pandas as pd
-import joblib
-import numpy as np
+from flask import Flask, request, jsonify, render_template
+from src.models.evaluate import FraudPredictor
+from src.config import MODEL_PATH, FeatureNames, THRESHOLD_CONFIG, FALLBACK_VALUES
 import logging
-from src.models.explainability import ModelExplainer
+from typing import Dict, Any
 
+app = Flask(__name__)
+
+# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize Flask app
-flask_app = Flask(__name__)
+predictor = FraudPredictor(MODEL_PATH)
 
-# Initialize Dash app within Flask
-dash_app = dash.Dash(
-    __name__,
-    server=flask_app,
-    url_base_pathname='/dashboard/'
-)
+@app.route('/dashboard')
+def dashboard():
+    """Render the evaluation dashboard"""
+    return render_template('dashboard.html')
 
-class FraudDetectionApp:
-    def __init__(self, model_path, preprocessor_path):
-        try:
-            self.model = joblib.load(model_path)
-            self.preprocessor = joblib.load(preprocessor_path)
-            self.feature_names = self._get_feature_names()
-            self.explainer = ModelExplainer(self.model, self.preprocessor, self.feature_names)
-        except Exception as e:
-            logger.error(f"Failed to initialize app: {str(e)}")
-            raise
-            
-    def _get_feature_names(self):
-        """Extract feature names from preprocessor"""
-        try:
-            # This should be implemented based on your preprocessor structure
-            # Example for ColumnTransformer with OneHotEncoder
-            numeric_features = self.preprocessor.transformers_[0][2]
-            ohe = self.preprocessor.named_transformers_['cat'].named_steps['onehot']
-            categorical_features = ohe.get_feature_names_out(
-                self.preprocessor.transformers_[1][2])
-            return list(numeric_features) + list(categorical_features)
-        except Exception as e:
-            logger.warning(f"Could not extract feature names: {str(e)}")
-            return []
-            
-    def predict(self, input_data):
-        """Make prediction using the model"""
-        try:
-            processed_data = self.preprocessor.transform(input_data)
-            prediction = self.model.predict(processed_data)
-            probability = self.model.predict_proba(processed_data)[:, 1]
-            return prediction, probability
-        except Exception as e:
-            logger.error(f"Prediction failed: {str(e)}")
-            raise
-            
-    def create_dash_layout(self):
-        """Create layout for Dash dashboard"""
-        return html.Div([
-            html.H1('Fraud Detection Dashboard'),
-            dcc.Tabs([
-                dcc.Tab(label='Real-time Monitoring', children=[
-                    dcc.Graph(id='live-update-graph'),
-                    dcc.Interval(
-                        id='interval-component',
-                        interval=60*1000,  # in milliseconds
-                        n_intervals=0
-                    )
-                ]),
-                dcc.Tab(label='Model Analysis', children=[
-                    dcc.Graph(id='feature-importance-graph'),
-                    html.Div(id='shap-summary-graph')
-                ]),
-                dcc.Tab(label='Transaction Explorer', children=[
-                    dcc.Dropdown(
-                        id='transaction-id-dropdown',
-                        options=[],  # Will be updated
-                        value=None
-                    ),
-                    html.Div(id='transaction-details')
-                ])
-            ])
-        ])
-        
-    def setup_dash_callbacks(self):
-        """Setup Dash callbacks"""
-        @dash_app.callback(
-            Output('live-update-graph', 'figure'),
-            Input('interval-component', 'n_intervals'))
-        def update_graph_live(n):
-            # This would be replaced with actual data fetching logic
-            df = pd.DataFrame({
-                'time': pd.date_range(start='2023-01-01', periods=100, freq='H'),
-                'fraud_prob': np.random.rand(100)
-            })
-            fig = px.line(df, x='time', y='fraud_prob', title='Real-time Fraud Probability')
-            return fig
-            
-        @dash_app.callback(
-            Output('feature-importance-graph', 'figure'),
-            Input('feature-importance-graph', 'id'))
-        def update_feature_importance(_):
-            # Get feature importances from model
-            if hasattr(self.model, 'feature_importances_'):
-                importance = self.model.feature_importances_
-                features = self.feature_names[:len(importance)]
-                df = pd.DataFrame({'Feature': features, 'Importance': importance})
-                df = df.sort_values('Importance', ascending=False).head(20)
-                fig = px.bar(df, x='Importance', y='Feature', orientation='h',
-                            title='Top 20 Important Features')
-                return fig
-            return {}
-            
-# Initialize the app
-try:
-    app = FraudDetectionApp(
-        model_path='models/best_model.pkl',
-        preprocessor_path='models/preprocessor.pkl')
-        
-    # Set up Dash
-    dash_app.layout = app.create_dash_layout()
-    app.setup_dash_callbacks()
-except Exception as e:
-    logger.error(f"Failed to initialize application: {str(e)}")
-
-# Flask routes
-@flask_app.route('/')
-def home():
-    return render_template('index.html')
-
-@flask_app.route('/predict', methods=['POST'])
+@app.route('/predict', methods=['POST'])
 def predict():
+    """Handle transaction evaluation requests with proper JSON serialization"""
+    # Check content type
+    if not request.is_json:
+        return jsonify({
+            'error': 'Content-Type must be application/json',
+            'status': 415
+        }), 415
+        
     try:
-        data = request.get_json()
-        input_df = pd.DataFrame([data])
-        prediction, probability = app.predict(input_df)
+        data = request.get_json()  # Use get_json() instead of .json for better error handling
+        
+        # Validate required fields
+        required = [
+            'amount',
+            'ip_address',
+            'device_id',
+            'user_id',
+            'timestamp'
+        ]
+        missing = [field for field in required if field not in data]
+        if missing:
+            return jsonify({
+                'error': f'Missing required fields: {missing}',
+                'status': 400
+            }), 400
+        
+        # Set default values for optional fields
+        defaults = {
+            'user_age': float(FALLBACK_VALUES.get('user_age', 30)),
+            'account_age_days': float(FALLBACK_VALUES.get('account_age_days', 365)),
+            'transaction_count_7d': float(FALLBACK_VALUES.get('transaction_count_7d', 10)),
+            'is_foreign_ip': float(FALLBACK_VALUES.get('is_foreign_ip', 0)),
+            'device_change_flag': float(FALLBACK_VALUES.get('device_change_flag', 0)),
+            'country_risk_score': float(FALLBACK_VALUES.get('country_risk_score', 0.5)),
+            'time_since_last_transaction': float(FALLBACK_VALUES.get('time_since_last_transaction', 1440)),
+            'purchase_frequency_24h': float(FALLBACK_VALUES.get('purchase_frequency_24h', 1)),
+            'billing_shipping_mismatch': float(FALLBACK_VALUES.get('billing_shipping_mismatch', 0)),
+            'user_avg_transaction': float(FALLBACK_VALUES.get('user_avg_transaction', 100))
+        }
+        
+        transaction = {**defaults, **data}
+        
+        # Evaluate transaction
+        result = predictor.predict_with_dynamic_threshold(transaction)
+        
         return jsonify({
-            'prediction': int(prediction[0]),
-            'probability': float(probability[0]),
-            'status': 'success'
+            'status': 200,
+            'result': result.to_dict()
         })
+        
     except Exception as e:
-        logger.error(f"API prediction error: {str(e)}")
+        logger.error(f"API Error: {str(e)}", exc_info=True)
         return jsonify({
-            'status': 'error',
-            'message': str(e)
+            'error': str(e),
+            'status': 500
         }), 500
 
 if __name__ == '__main__':
-    flask_app.run(debug=True, host='0.0.0.0')
+    app.run(host='0.0.0.0', debug=True)

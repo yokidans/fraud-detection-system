@@ -2,259 +2,331 @@
 import numpy as np
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.impute import SimpleImputer
-from sklearn.compose import ColumnTransformer
+from sklearn.compose import ColumnTransformer, make_column_selector
 from sklearn.pipeline import Pipeline
-from sklearn.feature_extraction import FeatureHasher
 from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.utils.validation import check_is_fitted
 from imblearn.over_sampling import SMOTE
-from imblearn.under_sampling import RandomUnderSampler
-from imblearn.pipeline import Pipeline as ImbPipeline
 import logging
-from scipy.sparse import csr_matrix, save_npz
-from typing import List, Tuple, Union
+from typing import List, Tuple, Dict, Union, Set
+from collections import OrderedDict
 
-logging.basicConfig(level=logging.INFO)
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
-class SimpleImputerWithNames(SimpleImputer):
-    """Enhanced SimpleImputer that preserves feature names"""
+class TimeFeatureExtractor(BaseEstimator, TransformerMixin):
+    """Extracts time-based features with improved feature naming"""
+    def __init__(self, time_config: Dict):
+        self.time_config = time_config
+        self.feature_names_ = OrderedDict([
+            ('time_since_signup', 'time_since_signup'),
+            ('purchase_hour', 'purchase_hour'),
+            ('purchase_day_of_week', 'purchase_day_of_week'),
+            ('is_weekend', 'is_weekend'),
+            ('time_since_last_purchase', 'time_since_last_purchase'),
+            ('hourly_purchase_pattern', 'hourly_purchase_pattern')
+        ])
+        
+        # Validate required config fields
+        required_fields = ['signup_time_col', 'purchase_time_col', 'time_format', 'id_column']
+        for field in required_fields:
+            if field not in time_config:
+                raise ValueError(f"Missing required field in time_config: {field}")
+    
+    def fit(self, X, y=None):
+        return self
+        
+    def transform(self, X):
+        df = X.copy()
+        # Convert timestamp columns with error handling
+        for col in [self.time_config['signup_time_col'], self.time_config['purchase_time_col']]:
+            try:
+                df[col] = pd.to_datetime(df[col], format=self.time_config['time_format'])
+            except Exception as e:
+                raise ValueError(f"Failed to parse time column '{col}': {str(e)}")
+        
+        # Create time features with null checks
+        df['time_since_signup'] = (df[self.time_config['purchase_time_col']] - 
+                                 df[self.time_config['signup_time_col']]).dt.total_seconds()
+        
+        df['purchase_hour'] = df[self.time_config['purchase_time_col']].dt.hour
+        df['purchase_day_of_week'] = df[self.time_config['purchase_time_col']].dt.dayofweek
+        df['is_weekend'] = df['purchase_day_of_week'].isin([5, 6]).astype(int)
+        
+        # Time since last purchase with group validation
+        df = df.sort_values([self.time_config['id_column'], self.time_config['purchase_time_col']])
+        time_diff = df.groupby(self.time_config['id_column'])[self.time_config['purchase_time_col']].diff()
+        df['time_since_last_purchase'] = df.groupby(self.time_config['id_column'])[self.time_config['purchase_time_col']].diff().dt.total_seconds().fillna(0)
+        
+        # Hourly purchase pattern with temporary column cleanup
+        df['_temp_hour'] = df[self.time_config['purchase_time_col']].dt.hour
+        df['hourly_purchase_pattern'] = df.groupby(
+            [self.time_config['id_column'], '_temp_hour']
+        )[self.time_config['purchase_time_col']].transform('count')
+        df = df.drop(columns=['_temp_hour'])
+        
+        return df
+
     def get_feature_names_out(self, input_features=None):
-        check_is_fitted(self)
-        if input_features is None:
-            return [f"feature_{i}" for i in range(self.n_features_in_)]
-        return input_features
+        return list(self.feature_names_.values())
+
+class UserBehaviorTransformer(BaseEstimator, TransformerMixin):
+    """Enhanced user behavior feature transformer with duplicate prevention"""
+    def __init__(self, behavior_config: Dict):
+        self.behavior_config = behavior_config
+        self.feature_names_ = OrderedDict()
+        self.feature_names_['device_change_flag'] = 'device_change_flag'
+        
+        if 'ip_column' in behavior_config:
+            self.feature_names_['ip_change_flag'] = 'ip_change_flag'
+        
+        # Validate required fields
+        required_fields = ['id_column', 'device_column', 'purchase_time_col']
+        for field in required_fields:
+            if field not in behavior_config:
+                raise ValueError(f"Missing required field in behavior_config: {field}")
+        
+        # Validate and register window features
+        if 'window_sizes' in behavior_config:
+            for window in behavior_config['window_sizes']:
+                if not isinstance(window, (int, float)) or window <= 0:
+                    logger.warning(f"Invalid window size {window} - must be positive number")
+                    continue
+                
+                window = int(window)  # Ensure integer hours
+                freq_feature = f'purchase_freq_{window}h'
+                sum_feature = f'value_sum_{window}h'
+                
+                if freq_feature in self.feature_names_:
+                    logger.warning(f"Duplicate window feature {freq_feature} - skipping")
+                else:
+                    self.feature_names_[freq_feature] = freq_feature
+                    
+                    if 'value_column' in behavior_config:
+                        if sum_feature in self.feature_names_:
+                            logger.warning(f"Duplicate window feature {sum_feature} - skipping")
+                        else:
+                            self.feature_names_[sum_feature] = sum_feature
+    
+    def fit(self, X, y=None):
+        return self
+        
+    def transform(self, X):
+        df = X.copy()
+        time_col = self.behavior_config['purchase_time_col']
+        id_col = self.behavior_config['id_column']
+        
+        # Convert to datetime if not already
+        if not pd.api.types.is_datetime64_any_dtype(df[time_col]):
+            df[time_col] = pd.to_datetime(df[time_col], errors='coerce')
+        
+        # Sort by user and time
+        df = df.sort_values([id_col, time_col])
+        
+        # Window features with proper validation
+        if 'window_sizes' in self.behavior_config:
+            for window in self.behavior_config['window_sizes']:
+                if not isinstance(window, int) or window <= 0:
+                    logger.warning(f"Invalid window size {window} - skipping")
+                    continue
+                    
+                try:
+                    # Create window features
+                    window_str = f'{window}h'
+                    
+                    # Group by user and create rolling windows
+                    grouped = df.groupby(id_col, group_keys=False)
+                    
+                    # Purchase frequency
+                    df[f'purchase_freq_{window}h'] = (grouped[time_col]
+                        .rolling(window_str, closed='left')
+                        .count()
+                        .reset_index(level=0, drop=True))
+                    
+                    # Value sum if configured
+                    if 'value_column' in self.behavior_config:
+                        df[f'value_sum_{window}h'] = (grouped[self.behavior_config['value_column']]
+                            .rolling(window_str, closed='left')
+                            .sum()
+                            .reset_index(level=0, drop=True))
+                            
+                except Exception as e:
+                    logger.error(f"Failed to create {window}h window features: {str(e)}")
+                    # Fill with zeros if creation fails
+                    df[f'purchase_freq_{window}h'] = 0
+                    if 'value_column' in self.behavior_config:
+                        df[f'value_sum_{window}h'] = 0
+        
+        return df
+
+    def get_feature_names_out(self, input_features=None):
+        return list(self.feature_names_.values())
 
 class DataPreprocessor:
-    """
-    Comprehensive data preprocessing pipeline for fraud detection.
-    Handles numerical, categorical, and high-cardinality features,
-    datetime conversion, IP address processing, and class imbalance.
-    """
+    """Complete preprocessing pipeline with duplicate prevention"""
     
-    def __init__(self, config: dict):
-        """
-        Initialize the preprocessor with configuration.
-        
-        Args:
-            config (dict): Configuration dictionary containing:
-                - missing_values_strategy: Strategy for handling missing values
-                - sampling_strategy: Strategy for handling class imbalance
-                - random_state: Random seed for reproducibility
-        """
+    def __init__(self, config: Dict):
         self.config = config
         self.preprocessor = None
-        self.categorical_features: List[str] = []
-        self.numerical_features: List[str] = []
-        self.high_cardinality_features: List[str] = []
-        self.feature_names: List[str] = []
+        self.feature_names = []
+        self._sample_df = None
+        self._feature_registry = set()  # Track all features to prevent duplicates
+    
+    def _validate_data(self, df: pd.DataFrame, target_col: str) -> None:
+        """Validate input data meets requirements"""
+        required_cols = set(self.config['feature_config'].get('required_columns', []))
+        if not required_cols:
+            # Build required columns from config if not explicitly specified
+            time_config = self.config['feature_config']['time_features']
+            behavior_config = self.config['feature_config']['user_history']
+            required_cols = {
+                time_config['signup_time_col'],
+                time_config['purchase_time_col'],
+                behavior_config['id_column'],
+                behavior_config['device_column'],
+                target_col
+            }
+            if 'ip_mapping' in self.config['feature_config']:
+                ip_config = self.config['feature_config']['ip_mapping']
+                if 'ip_column' in ip_config:
+                    required_cols.add(ip_config['ip_column'])
         
-    def _convert_datetime(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Convert datetime columns to numeric timestamps"""
-        datetime_cols = ['signup_time', 'purchase_time']
-        for col in datetime_cols:
-            if col in df.columns:
-                try:
-                    df[col] = pd.to_datetime(df[col]).astype('int64') // 10**9
-                except Exception as e:
-                    logger.warning(f"Failed to convert {col} to timestamp: {str(e)}")
-                    df[col] = pd.to_numeric(df[col], errors='coerce')
-        return df
+        missing_cols = required_cols - set(df.columns)
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+            
+        if target_col not in df.columns:
+            raise ValueError(f"Target column '{target_col}' not found in data")
+            
+        if df[target_col].nunique() != 2:
+            logger.warning("Target column may not be properly encoded as binary")
+    
+    def _create_feature_engineering_pipeline(self) -> Pipeline:
+        """Create pipeline for feature engineering steps with duplicate checks"""
+        time_extractor = TimeFeatureExtractor(self.config['feature_config']['time_features'])
+        behavior_processor = UserBehaviorTransformer(self.config['feature_config']['user_history'])
         
-    def _preprocess_ip(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Preprocess IP address to reduce cardinality with robust type handling"""
-        if 'ip_address' in df.columns:
-            try:
-                # Ensure IP address is string type
-                df['ip_address'] = df['ip_address'].astype(str)
-                # Extract first octet safely
-                df['ip_prefix'] = df['ip_address'].str.split('.').str[0]
-                # Convert to numeric if possible, otherwise categorize
-                try:
-                    df['ip_prefix'] = pd.to_numeric(df['ip_prefix'])
-                except ValueError:
-                    df['ip_prefix'] = df['ip_prefix'].astype('category')
-                df = df.drop('ip_address', axis=1)
-            except Exception as e:
-                logger.warning(f"IP address preprocessing failed: {str(e)}")
-                df = df.drop('ip_address', axis=1)
-        return df
+        return Pipeline([
+            ('time_extractor', time_extractor),
+            ('behavior_processor', behavior_processor)
+        ])
+    
+    def _create_preprocessing_pipeline(self) -> Pipeline:
+        """Create the complete preprocessing pipeline with feature validation"""
+        feature_engineering = self._create_feature_engineering_pipeline()
         
-    def _handle_missing_values(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Handle missing values with column-specific strategies"""
+        numeric_transformer = Pipeline([
+            ('imputer', SimpleImputer(strategy='median')),
+            ('scaler', StandardScaler())
+        ])
+
+        categorical_transformer = Pipeline([
+            ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
+            ('encoder', OneHotEncoder(handle_unknown='ignore', sparse_output=False))
+        ])
+
+        numeric_features = make_column_selector(dtype_include=np.number)
+        
+        # Get categorical features that exist in the data
+        cat_config = self.config['feature_config'].get('categorical_features', {})
+        available_categorical = []
+        if 'columns' in cat_config:
+            available_categorical = [col for col in cat_config['columns'] 
+                                  if col in self._sample_df.columns]
+        
+        transformers = [
+            ('num', numeric_transformer, numeric_features)
+        ]
+        
+        if available_categorical:
+            transformers.append(('cat', categorical_transformer, available_categorical))
+        
+        preprocessing = ColumnTransformer(transformers, remainder='drop')
+        
+        return Pipeline([
+            ('feature_engineering', feature_engineering),
+            ('preprocessing', preprocessing)
+        ])
+    
+    def _get_unique_feature_names(self) -> List[str]:
+        """Generate unique feature names with validation"""
+        unique_features = []
+        
+        # Get engineered features
+        for step in ['time_extractor', 'behavior_processor']:
+            transformer = self.preprocessor.named_steps['feature_engineering'].named_steps[step]
+            for name in transformer.get_feature_names_out():
+                if name not in self._feature_registry:
+                    self._feature_registry.add(name)
+                    unique_features.append(name)
+        
+        # Get preprocessed features
+        preprocessor = self.preprocessor.named_steps['preprocessing']
+        for name, trans, cols in preprocessor.transformers_:
+            if hasattr(trans, 'get_feature_names_out'):
+                features = trans.get_feature_names_out()
+                unique_features.extend(f for f in features if f not in self._feature_registry)
+        
+        return unique_features[:self.preprocessor.transform(self._sample_df).shape[1]]
+        
+    def preprocess_data(self, df: pd.DataFrame, target_col: str) -> Tuple[np.ndarray, np.ndarray, List[str]]:
+        """Main preprocessing method with enhanced error handling and feature tracking"""
         try:
-            numeric_cols = df.select_dtypes(include=np.number).columns
-            non_numeric_cols = df.select_dtypes(exclude=np.number).columns
+            logger.info("Starting data preprocessing pipeline...")
+            self._validate_data(df, target_col)
             
-            if self.config.get('missing_values_strategy') == 'drop':
-                return df.dropna()
-            else:
-                # Use our enhanced imputer that preserves feature names
-                num_imputer = SimpleImputerWithNames(strategy='median')
-                df[numeric_cols] = num_imputer.fit_transform(df[numeric_cols])
-                
-                if len(non_numeric_cols) > 0:
-                    cat_imputer = SimpleImputerWithNames(strategy='most_frequent', fill_value='missing')
-                    df[non_numeric_cols] = cat_imputer.fit_transform(df[non_numeric_cols])
-                
-                return df
-        except Exception as e:
-            logger.error(f"Error handling missing values: {str(e)}")
-            raise
+            # Store a sample for column checking
+            self._sample_df = df.copy()
+            self._feature_registry = set()  # Reset feature registry
             
-    def _remove_duplicates(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Remove duplicate rows while preserving the first occurrence"""
-        return df.drop_duplicates(keep='first')
-        
-    def _correct_data_types(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Ensure correct data types for all columns"""
-        type_map = {
-            'user_id': 'str',
-            'purchase_value': 'float32',
-            'age': 'int32',
-            'class': 'int32',
-            'device_id': 'str',
-            'ip_address': 'str'
-        }
-        for col, dtype in type_map.items():
-            if col in df.columns:
-                try:
-                    df[col] = df[col].astype(dtype)
-                except Exception as e:
-                    logger.warning(f"Failed to convert {col} to {dtype}: {str(e)}")
-                    if col not in ['user_id', 'device_id']:
-                        df = df.drop(col, axis=1)
-        return df
-        
-    def _get_feature_names(self, column_transformer: ColumnTransformer) -> List[str]:
-        """Get feature names from ColumnTransformer with comprehensive handling"""
-        feature_names = []
-        
-        for name, transformer, features in column_transformer.transformers_:
-            if transformer == 'drop':
-                continue
-                
-            if name == 'hash':
-                # Special handling for FeatureHasher
-                names = [f'hash_{i}' for i in range(transformer.named_steps['hasher'].n_features)]
-            elif hasattr(transformer, 'get_feature_names_out'):
-                # Modern sklearn versions (>=1.0)
-                names = transformer.get_feature_names_out(features)
-            elif hasattr(transformer, 'get_feature_names'):
-                # Older sklearn versions
-                names = transformer.get_feature_names(features)
-            elif hasattr(transformer, 'named_steps'):
-                # Handle pipeline components
-                names = features
-                for step_name, step in transformer.named_steps.items():
-                    if hasattr(step, 'get_feature_names_out'):
-                        names = step.get_feature_names_out(names)
-                    elif hasattr(step, 'get_feature_names'):
-                        names = step.get_feature_names(names)
-            else:
-                # Fallback to original feature names
-                names = features
-                
-            feature_names.extend(names)
+            # Convert data types with validation
+            time_config = self.config['feature_config']['time_features']
+            df[time_config['purchase_time_col']] = pd.to_datetime(
+                df[time_config['purchase_time_col']],
+                errors='coerce'
+            )
+            df[time_config['signup_time_col']] = pd.to_datetime(
+                df[time_config['signup_time_col']],
+                errors='coerce'
+            )
             
-        return feature_names
-        
-    def _identify_feature_types(self, X: pd.DataFrame):
-        """Identify feature types including high-cardinality features"""
-        self.categorical_features = X.select_dtypes(include=['object', 'category']).columns.tolist()
-        self.numerical_features = X.select_dtypes(include=np.number).columns.tolist()
-        
-        # Identify high-cardinality features (>100 unique values)
-        self.high_cardinality_features = []
-        regular_categorical = []
-        
-        for col in self.categorical_features:
-            if X[col].nunique() > 100:
-                self.high_cardinality_features.append(col)
-            else:
-                regular_categorical.append(col)
-        
-        self.categorical_features = regular_categorical
-        
-        logger.info(f"Numerical features: {self.numerical_features}")
-        logger.info(f"Regular categorical features: {self.categorical_features}")
-        logger.info(f"High-cardinality features: {self.high_cardinality_features}")
-        
-    def preprocess_data(self, df: pd.DataFrame, target_col: str) -> Tuple[Union[np.ndarray, csr_matrix], np.ndarray, List[str]]:
-        """
-        Main preprocessing method that handles the entire pipeline.
-        
-        Args:
-            df: Input DataFrame containing raw data
-            target_col: Name of the target column
+            # Handle IP mapping if configured
+            if 'ip_mapping' in self.config['feature_config']:
+                ip_config = self.config['feature_config']['ip_mapping']
+                if 'country_column' in ip_config and ip_config['country_column'] not in df.columns:
+                    logger.warning(f"Country column {ip_config['country_column']} not found - skipping")
             
-        Returns:
-            tuple: (processed_features, target, feature_names)
-        """
-        try:
-            logger.info("Starting data preprocessing...")
-            
-            # Initial cleaning and type conversion
-            df = self._correct_data_types(df)
-            df = self._convert_datetime(df)
-            df = self._preprocess_ip(df)
-            df = self._handle_missing_values(df)
-            df = self._remove_duplicates(df)
-            
-            # Separate features and target
+            # Create and fit the preprocessing pipeline
+            self.preprocessor = self._create_preprocessing_pipeline()
             X = df.drop(columns=[target_col])
             y = df[target_col].values
             
-            # Identify feature types
-            self._identify_feature_types(X)
+            X_processed = self.preprocessor.fit_transform(X, y)
             
-            # Create preprocessing pipelines with our enhanced imputer
-            numeric_transformer = Pipeline(steps=[
-                ('imputer', SimpleImputerWithNames(strategy='median')),
-                ('scaler', StandardScaler())
-            ])
+            # Get unique feature names with duplicate prevention
+            self.feature_names = self._get_unique_feature_names()
             
-            # Regular categorical features (low cardinality)
-            categorical_transformer = Pipeline(steps=[
-                ('imputer', SimpleImputerWithNames(strategy='most_frequent', fill_value='missing')),
-                ('onehot', OneHotEncoder(handle_unknown='ignore', sparse=True))
-            ])
+            # Validate feature count matches processed data
+            if len(self.feature_names) != X_processed.shape[1]:
+                raise ValueError(
+                    f"Feature count mismatch: {len(self.feature_names)} names vs {X_processed.shape[1]} features"
+                )
             
-            # High-cardinality features - using FeatureHasher
-            hasher = FeatureHasher(n_features=50, input_type='string')
-            high_card_transformer = Pipeline(steps=[
-                ('imputer', SimpleImputerWithNames(strategy='constant', fill_value='missing')),
-                ('hasher', hasher)
-            ])
-            
-            # Create the complete ColumnTransformer
-            self.preprocessor = ColumnTransformer(
-                transformers=[
-                    ('num', numeric_transformer, self.numerical_features),
-                    ('cat', categorical_transformer, self.categorical_features),
-                    ('hash', high_card_transformer, self.high_cardinality_features)
-                ],
-                remainder='drop'  # Drop any columns not explicitly transformed
-            )
-            
-            # Fit and transform the data
-            X_processed = self.preprocessor.fit_transform(X)
-            self.feature_names = self._get_feature_names(self.preprocessor)
-            
-            # Handle class imbalance
+            # Handle class imbalance if configured
             if self.config.get('sampling_strategy') == 'SMOTE':
-                smote = SMOTE(random_state=self.config.get('random_state', 42))
+                smote = SMOTE(
+                    sampling_strategy=self.config.get('sampling_ratio', 0.3),
+                    random_state=self.config.get('random_state', 42)
+                )
                 X_processed, y = smote.fit_resample(X_processed, y)
-            elif self.config.get('sampling_strategy') == 'undersample':
-                rus = RandomUnderSampler(random_state=self.config.get('random_state', 42))
-                X_processed, y = rus.fit_resample(X_processed, y)
             
-            logger.info(f"Processed data shape: {X_processed.shape}")
-            logger.info(f"Number of features: {len(self.feature_names)}")
-            logger.info("Preprocessing completed successfully")
-            
+            logger.info(f"Successfully processed data. Shape: {X_processed.shape}")
+            logger.info(f"Feature names: {self.feature_names}")
             return X_processed, y, self.feature_names
             
         except Exception as e:
-            logger.error(f"Error during preprocessing: {str(e)}", exc_info=True)
-            raise RuntimeError(f"Preprocessing failed: {str(e)}") from e
+            logger.error(f"Preprocessing failed: {str(e)}", exc_info=True)
+            raise RuntimeError(f"Data preprocessing error: {str(e)}") from e
